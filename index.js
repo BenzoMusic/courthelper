@@ -66,10 +66,19 @@ app.post('/api/saveTheme', async (req, res) => {
 app.post('/api/getTheme', async (req, res) => {
     try {
         const { username } = req.body;
-        const doc = await db.collection('themes').doc(username || '__ping__').get();
-        res.json({ theme: doc.exists ? doc.data().theme : 'dark' });
+        // Для ping-запросов возвращаем успешный ответ без обращения к БД
+        if (username === '__ping__') {
+            return res.json({ success: true, theme: 'dark' });
+        }
+        const doc = await db.collection('themes').doc(username).get();
+        res.json({ success: true, theme: doc.exists ? doc.data().theme : 'dark' });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        console.error('getTheme error:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Database error',
+            message: err.message 
+        });
     }
 });
 
