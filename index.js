@@ -1,9 +1,12 @@
 import express from 'express';
 import cors from 'cors';
-import { Firestore } from '@google-cloud/firestore';
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: '*', // или укажите ваш сайт: 'https://magnificent-sunflower-d07b82.netlify.app'
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+}));
 app.use(express.json());
 
 const db = new Firestore();
