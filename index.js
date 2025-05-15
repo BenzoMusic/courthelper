@@ -1,15 +1,37 @@
 import express from 'express';
 import cors from 'cors';
+import { Firestore } from '@google-cloud/firestore';
 
 const app = express();
+
+// Улучшенный CORS с поддержкой всех необходимых заголовков
 app.use(cors({
-    origin: '*', // или укажите ваш сайт: 'https://magnificent-sunflower-d07b82.netlify.app'
+    origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 200
 }));
+
 app.use(express.json());
 
+// Создаем инстанс Firestore
 const db = new Firestore();
+
+// Middleware для логирования запросов
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    next();
+});
+
+// Middleware для обработки ошибок
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ 
+        success: false, 
+        error: 'Internal Server Error',
+        message: err.message 
+    });
+});
 
 // --- USERS ---
 app.post('/api/register', async (req, res) => {
@@ -91,6 +113,11 @@ app.post('/api/getUserDocs', async (req, res) => {
     res.json({ links });
 });
 
+// Добавляем health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: Date.now() });
+});
+
 // --- Запуск ---
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log('API started on port', PORT));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
