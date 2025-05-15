@@ -1,6 +1,6 @@
-const express = require('express');
-const cors = require('cors');
-const { Firestore } = require('@google-cloud/firestore');
+import express from 'express';
+import cors from 'cors';
+import { Firestore } from '@google-cloud/firestore';
 
 const app = express();
 app.use(cors());
