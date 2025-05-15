@@ -33,6 +33,9 @@ app.use((err, req, res, next) => {
     });
 });
 
+// Добавляем обработку OPTIONS для CORS
+app.options('*', cors()); // Важно для preflight requests
+
 // --- USERS ---
 app.post('/api/register', async (req, res) => {
     const { username, password, vk } = req.body;
@@ -61,9 +64,13 @@ app.post('/api/saveTheme', async (req, res) => {
     res.json({ success: true });
 });
 app.post('/api/getTheme', async (req, res) => {
-    const { username } = req.body;
-    const doc = await db.collection('themes').doc(username).get();
-    res.json({ theme: doc.exists ? doc.data().theme : 'dark' });
+    try {
+        const { username } = req.body;
+        const doc = await db.collection('themes').doc(username || '__ping__').get();
+        res.json({ theme: doc.exists ? doc.data().theme : 'dark' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 // --- LAWSUITS ---
@@ -113,8 +120,8 @@ app.post('/api/getUserDocs', async (req, res) => {
     res.json({ links });
 });
 
-// Добавляем health check endpoint
-app.get('/health', (req, res) => {
+// Исправляем путь для health check
+app.post('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: Date.now() });
 });
 
