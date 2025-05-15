@@ -4,24 +4,48 @@ import { Firestore } from '@google-cloud/firestore';
 
 const app = express();
 
-// Улучшенный CORS с поддержкой всех необходимых заголовков
-app.use(cors({
-    origin: '*',
+// Настраиваем CORS для всех запросов
+const corsOptions = {
+    origin: [
+        'https://magnificent-sunflower-d07b82.netlify.app',
+        'http://localhost:3000',
+        'http://localhost:5000'
+    ],
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
     optionsSuccessStatus: 200
-}));
+};
+
+// Применяем CORS ко всем маршрутам
+app.use(cors(corsOptions));
+
+// Отдельно обрабатываем preflight запросы
+app.options('*', cors(corsOptions));
+
+// Добавляем промежуточное ПО для всех запросов
+app.use((req, res, next) => {
+    // Устанавливаем заголовки CORS для каждого ответа
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Логируем запрос
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    
+    // Для OPTIONS запросов сразу отправляем успешный ответ
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    next();
+});
 
 app.use(express.json());
 
 // Создаем инстанс Firestore
 const db = new Firestore();
-
-// Middleware для логирования запросов
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-    next();
-});
 
 // Middleware для обработки ошибок
 app.use((err, req, res, next) => {
@@ -32,9 +56,6 @@ app.use((err, req, res, next) => {
         message: err.message 
     });
 });
-
-// Добавляем обработку OPTIONS для CORS
-app.options('*', cors()); // Важно для preflight requests
 
 // --- USERS ---
 app.post('/api/register', async (req, res) => {
