@@ -13,6 +13,9 @@ RUN npm install
 # Копируем остальные файлы проекта
 COPY . .
 
+# Проверяем наличие ключа
+RUN if [ ! -f serviceAccountKey.json ]; then echo "Service account key not found!"; exit 1; fi
+
 # Открываем порт 8080 (Cloud Run использует этот порт по умолчанию)
 EXPOSE 8080
 

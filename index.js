@@ -1,76 +1,48 @@
 import express from 'express';
 import cors from 'cors';
 import { Firestore } from '@google-cloud/firestore';
+import { firestoreConfig } from './firestore.config.js';
 
 const app = express();
 
-// Настраиваем CORS для всех запросов
-const corsOptions = {
-    origin: [
-        'https://magnificent-sunflower-d07b82.netlify.app',
-        'http://localhost:3000',
-        'http://localhost:5000'
-    ],
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 204 // Изменено на 204
-};
-
-// Применяем CORS ко всем маршрутам
-app.use(cors(corsOptions));
-
-// Отдельно обрабатываем preflight запросы
-app.options('*', cors(corsOptions));
-
-// Добавляем промежуточное ПО для всех запросов
-app.use((req, res, next) => {
-    // Устанавливаем заголовки CORS для каждого ответа
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    // Логируем запрос
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-    
-    // Для OPTIONS запросов сразу отправляем успешный ответ
-    if (req.method === 'OPTIONS') {
-        return res.status(204).end(); // Изменено на 204
-    }
-    
-    next();
-});
-
 app.use(express.json());
+app.use(cors({
+    origin: '*',
+    credentials: false
+}));
 
-// Создаем инстанс Firestore
-const db = new Firestore();
-
-// Middleware для обработки ошибок
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ 
-        success: false, 
-        error: 'Internal Server Error',
-        message: err.message 
-    });
-});
+const db = new Firestore(firestoreConfig);
 
 // --- USERS ---
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password, vk } = req.body;
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username and password are required'
+            });
+        }
         const userRef = db.collection('users').doc(username);
         const userDoc = await userRef.get();
         if (userDoc.exists) {
-            return res.status(400).json({ success: false, message: 'Пользователь уже существует!' });
+            return res.status(400).json({
+                success: false,
+                message: 'Пользователь уже существует!'
+            });
         }
-        await userRef.set({ password, vk, created: Date.now() });
+        await userRef.set({
+            password,
+            vk: vk || '',
+            created: Date.now()
+        });
         res.json({ success: true });
     } catch (err) {
         console.error('Register error:', err);
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
     }
 });
 
@@ -94,7 +66,7 @@ app.post('/api/saveTheme', async (req, res) => {
         const { username, theme } = req.body;
         await db.collection('themes').doc(username).set({ theme });
         res.json({ success: true });
-    }  catch (err) {
+    } catch (err) {
         console.error('saveTheme error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
@@ -103,7 +75,6 @@ app.post('/api/saveTheme', async (req, res) => {
 app.post('/api/getTheme', async (req, res) => {
     try {
         const { username } = req.body;
-        // Для ping-запросов возвращаем успешный ответ без обращения к БД
         if (username === '__ping__') {
             return res.json({ success: true, theme: 'dark' });
         }
@@ -122,7 +93,7 @@ app.post('/api/addLawsuit', async (req, res) => {
         const ref = db.collection('lawsuits').doc();
         await ref.set({ username, url, plaintiff, defendant, note, status, created, id: ref.id });
         res.json({ success: true });
-    }  catch (err) {
+    } catch (err) {
         console.error('addLawsuit error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
@@ -135,7 +106,7 @@ app.post('/api/getLawsuits', async (req, res) => {
         const lawsuits = [];
         snap.forEach(doc => lawsuits.push(doc.data()));
         res.json({ lawsuits });
-    }  catch (err) {
+    } catch (err) {
         console.error('getLawsuits error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
@@ -150,7 +121,7 @@ app.post('/api/updateLawsuit', async (req, res) => {
             await ref.update({ status });
         }
         res.json({ success: true });
-    }  catch (err) {
+    } catch (err) {
         console.error('updateLawsuit error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
@@ -165,7 +136,7 @@ app.post('/api/deleteLawsuit', async (req, res) => {
             await ref.delete();
         }
         res.json({ success: true });
-    }  catch (err) {
+    } catch (err) {
         console.error('deleteLawsuit error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
@@ -177,7 +148,7 @@ app.post('/api/addUserDoc', async (req, res) => {
         const { username, title, url } = req.body;
         await db.collection('userdocs').add({ username, title, url });
         res.json({ success: true });
-    }  catch (err) {
+    } catch (err) {
         console.error('addUserDoc error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
@@ -190,17 +161,15 @@ app.post('/api/getUserDocs', async (req, res) => {
         const links = [];
         snap.forEach(doc => links.push({ title: doc.data().title, url: doc.data().url }));
         res.json({ links });
-    }  catch (err) {
+    } catch (err) {
         console.error('getUserDocs error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// Исправляем путь для health check
 app.post('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: Date.now() });
 });
 
-// --- Запуск ---
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
