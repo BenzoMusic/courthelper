@@ -14,7 +14,7 @@ const corsOptions = {
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 204 // Изменено на 204
 };
 
 // Применяем CORS ко всем маршрутам
@@ -36,7 +36,7 @@ app.use((req, res, next) => {
     
     // Для OPTIONS запросов сразу отправляем успешный ответ
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        return res.status(204).end(); // Изменено на 204
     }
     
     next();
@@ -59,31 +59,47 @@ app.use((err, req, res, next) => {
 
 // --- USERS ---
 app.post('/api/register', async (req, res) => {
-    const { username, password, vk } = req.body;
-    const userRef = db.collection('users').doc(username);
-    const userDoc = await userRef.get();
-    if (userDoc.exists) {
-        return res.json({ success: false, message: 'Пользователь уже существует!' });
+    try {
+        const { username, password, vk } = req.body;
+        const userRef = db.collection('users').doc(username);
+        const userDoc = await userRef.get();
+        if (userDoc.exists) {
+            return res.status(400).json({ success: false, message: 'Пользователь уже существует!' });
+        }
+        await userRef.set({ password, vk, created: Date.now() });
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Register error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
-    await userRef.set({ password, vk, created: Date.now() });
-    res.json({ success: true });
 });
 
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
-    const userDoc = await db.collection('users').doc(username).get();
-    if (!userDoc.exists || userDoc.data().password !== password) {
-        return res.json({ success: false });
+    try {
+        const { username, password } = req.body;
+        const userDoc = await db.collection('users').doc(username).get();
+        if (!userDoc.exists || userDoc.data().password !== password) {
+            return res.status(401).json({ success: false, message: 'Неверный логин или пароль' });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
-    res.json({ success: true });
 });
 
 // --- THEME ---
 app.post('/api/saveTheme', async (req, res) => {
-    const { username, theme } = req.body;
-    await db.collection('themes').doc(username).set({ theme });
-    res.json({ success: true });
+    try {
+        const { username, theme } = req.body;
+        await db.collection('themes').doc(username).set({ theme });
+        res.json({ success: true });
+    }  catch (err) {
+        console.error('saveTheme error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
+
 app.post('/api/getTheme', async (req, res) => {
     try {
         const { username } = req.body;
@@ -95,59 +111,89 @@ app.post('/api/getTheme', async (req, res) => {
         res.json({ success: true, theme: doc.exists ? doc.data().theme : 'dark' });
     } catch (err) {
         console.error('getTheme error:', err);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Database error',
-            message: err.message 
-        });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
 // --- LAWSUITS ---
 app.post('/api/addLawsuit', async (req, res) => {
-    const { username, url, plaintiff, defendant, note, status, created } = req.body;
-    const ref = db.collection('lawsuits').doc();
-    await ref.set({ username, url, plaintiff, defendant, note, status, created, id: ref.id });
-    res.json({ success: true });
+    try {
+        const { username, url, plaintiff, defendant, note, status, created } = req.body;
+        const ref = db.collection('lawsuits').doc();
+        await ref.set({ username, url, plaintiff, defendant, note, status, created, id: ref.id });
+        res.json({ success: true });
+    }  catch (err) {
+        console.error('addLawsuit error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
+
 app.post('/api/getLawsuits', async (req, res) => {
-    const { username } = req.body;
-    const snap = await db.collection('lawsuits').where('username', '==', username).get();
-    const lawsuits = [];
-    snap.forEach(doc => lawsuits.push(doc.data()));
-    res.json({ lawsuits });
+    try {
+        const { username } = req.body;
+        const snap = await db.collection('lawsuits').where('username', '==', username).get();
+        const lawsuits = [];
+        snap.forEach(doc => lawsuits.push(doc.data()));
+        res.json({ lawsuits });
+    }  catch (err) {
+        console.error('getLawsuits error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
+
 app.post('/api/updateLawsuit', async (req, res) => {
-    const { username, id, status } = req.body;
-    const ref = db.collection('lawsuits').doc(id);
-    const doc = await ref.get();
-    if (doc.exists && doc.data().username === username) {
-        await ref.update({ status });
+    try {
+        const { username, id, status } = req.body;
+        const ref = db.collection('lawsuits').doc(id);
+        const doc = await ref.get();
+        if (doc.exists && doc.data().username === username) {
+            await ref.update({ status });
+        }
+        res.json({ success: true });
+    }  catch (err) {
+        console.error('updateLawsuit error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
-    res.json({ success: true });
 });
+
 app.post('/api/deleteLawsuit', async (req, res) => {
-    const { username, id } = req.body;
-    const ref = db.collection('lawsuits').doc(id);
-    const doc = await ref.get();
-    if (doc.exists && doc.data().username === username) {
-        await ref.delete();
+    try {
+        const { username, id } = req.body;
+        const ref = db.collection('lawsuits').doc(id);
+        const doc = await ref.get();
+        if (doc.exists && doc.data().username === username) {
+            await ref.delete();
+        }
+        res.json({ success: true });
+    }  catch (err) {
+        console.error('deleteLawsuit error:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
-    res.json({ success: true });
 });
 
 // --- USER DOCS ---
 app.post('/api/addUserDoc', async (req, res) => {
-    const { username, title, url } = req.body;
-    await db.collection('userdocs').add({ username, title, url });
-    res.json({ success: true });
+    try {
+        const { username, title, url } = req.body;
+        await db.collection('userdocs').add({ username, title, url });
+        res.json({ success: true });
+    }  catch (err) {
+        console.error('addUserDoc error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
+
 app.post('/api/getUserDocs', async (req, res) => {
-    const { username } = req.body;
-    const snap = await db.collection('userdocs').where('username', '==', username).get();
-    const links = [];
-    snap.forEach(doc => links.push({ title: doc.data().title, url: doc.data().url }));
-    res.json({ links });
+    try {
+        const { username } = req.body;
+        const snap = await db.collection('userdocs').where('username', '==', username).get();
+        const links = [];
+        snap.forEach(doc => links.push({ title: doc.data().title, url: doc.data().url }));
+        res.json({ links });
+    }  catch (err) {
+        console.error('getUserDocs error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 // Исправляем путь для health check
